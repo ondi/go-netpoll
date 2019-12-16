@@ -6,6 +6,9 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
+import "io"
+import "net"
+
 func GetIpPort(sa unix.Sockaddr) (ip string, port int) {
 	if ip4, ok := sa.(* unix.SockaddrInet4); ok {
 		ip = net.IP(ip4.Addr[:]).String()
