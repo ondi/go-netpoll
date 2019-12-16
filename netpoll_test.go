@@ -13,7 +13,6 @@ func TestEpoll1(t * testing.T) {
 		t.Errorf("NEW: %v", err)
 		return
 	}
-	
 	go func() {
 		p.Wait(1024)
 		t.Log("LOOP END")

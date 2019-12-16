@@ -21,17 +21,14 @@ func New(closed_ttl time.Duration) (self * Netpoll_t, err error) {
 	if self.poller, err = unix.Kqueue(); err != nil {
 		return
 	}
-	// if self.event, err = unix.Eventfd(0, 0); err != nil {
-	// 	unix.Close(self.poller)
-	// 	return
-	// }
-	// var event [1]unix.Kevent_t
-	// unix.SetKevent(&event[0], self.event, unix.EV_ADD, unix.EVFILT_READ)
-	// if _, err = unix.Kevent(self.poller, event[:], nil, nil); err != nil {
-	// 	unix.Close(self.poller)
-	// 	unix.Close(self.event)
-	// 	return
-	// }
+	self.event = 0
+	var event [1]unix.Kevent_t
+	unix.SetKevent(&event[0], self.event, unix.EVFILT_USER, unix.EV_ADD)
+	event[0].Fflags = unix.NOTE_FFNOP
+	if _, err = unix.Kevent(self.poller, event[:], nil, nil); err != nil {
+		unix.Close(self.poller)
+		return
+	}
 	return
 }
 
@@ -51,7 +48,7 @@ func (self * Netpoll_t) Listen(ip string, port int, zone uint32, backlog int) (e
 		return
 	}
 	var event [1]unix.Kevent_t
-	unix.SetKevent(&event[0], listen, unix.EV_ADD, unix.EVFILT_READ)
+	unix.SetKevent(&event[0], listen, unix.EVFILT_READ, unix.EV_ADD)
 	if _, err = unix.Kevent(self.poller, event[:], nil, nil); err != nil {
 		unix.Close(listen)
 		return
@@ -67,7 +64,7 @@ func (self * Netpoll_t) Add(fd int) (err error) {
 		return
 	}
 	var event [1]unix.Kevent_t
-	unix.SetKevent(&event[0], fd, unix.EV_ADD, unix.EVFILT_READ)
+	unix.SetKevent(&event[0], fd, unix.EVFILT_READ, unix.EV_ADD)
 	if _, err = unix.Kevent(self.poller, event[:], nil, nil); err != nil {
 		return
 	}
@@ -80,7 +77,7 @@ func (self * Netpoll_t) Del(fd int) (err error) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
 	var event [1]unix.Kevent_t
-	unix.SetKevent(&event[0], fd, unix.EV_DELETE, 0)
+	unix.SetKevent(&event[0], fd, 0, unix.EV_DELETE)
 	if _, err = unix.Kevent(self.poller, event[:], nil, nil); err != nil {
 		return
 	}
@@ -101,7 +98,7 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 			return
 		}
 		for i := 0; i < count; i++ {
-			if int(events[i].Ident) == self.event {
+			if int(events[i].Ident) == self.event && events[i].Filter == unix.EVFILT_USER {
 				return
 			}
 			if int(events[i].Ident) == self.listen {
@@ -118,7 +115,7 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 				}
 				continue
 			}
-			if events[i].Filter & unix.EVFILT_VNODE == unix.EVFILT_VNODE /*&& events[i].Ffilter & unix.NOTE_CLOSE == unix.NOTE_CLOSE*/ {
+			if events[i].Filter & unix.EVFILT_VNODE == unix.EVFILT_VNODE && events[i].Fflags & unix.NOTE_CLOSE_WRITE == unix.NOTE_CLOSE_WRITE {
 				self.fd_event_close(int(events[i].Ident))
 				continue
 			}
@@ -128,13 +125,15 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 }
 
 func (self * Netpoll_t) Stop() (err error) {
-	_, err = unix.Write(self.event, []byte{1, 0, 0, 0, 0, 0, 0, 0})
+	var event [1]unix.Kevent_t
+	unix.SetKevent(&event[0], self.event, unix.EVFILT_USER, 0)
+	event[0].Fflags = unix.NOTE_TRIGGER
+	_, err = unix.Kevent(self.poller, event[:], nil, nil)
 	return
 }
 
 func (self * Netpoll_t) Close() (err error) {
 	unix.Close(self.listen)
-	unix.Close(self.event)
 	unix.Close(self.poller)
 	return
 }
