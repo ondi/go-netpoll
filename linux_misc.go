@@ -9,7 +9,7 @@ import "strconv"
 import "golang.org/x/sys/unix"
 
 func EVENTS(in uint32) (res []string) {
-	for in > 0 {
+	for in != 0 {
 		switch {
 		case in & unix.EPOLLIN == unix.EPOLLIN:
 			in ^= unix.EPOLLIN

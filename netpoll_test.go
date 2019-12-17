@@ -5,17 +5,21 @@
 package netpoll
 
 import "time"
+import "sync"
 import "testing"
 
-func TestEpoll1(t * testing.T) {
+func TestPollerStop(t * testing.T) {
+	var wg sync.WaitGroup
+	
 	p, err := New(time.Second)
 	if err != nil {
 		t.Errorf("NEW: %v", err)
 		return
 	}
+	wg.Add(1)
 	go func() {
 		p.Wait(1024)
-		t.Log("LOOP END")
+		wg.Done()
 	}()
 	
 	go func() {
@@ -24,4 +28,5 @@ func TestEpoll1(t * testing.T) {
 	}()
 	
 	p.Wait(1024)
+	wg.Wait()
 }
