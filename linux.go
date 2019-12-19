@@ -32,6 +32,7 @@ func New(closed_ttl time.Duration) (self * Netpoll_t, err error) {
 		unix.Close(self.event)
 		return
 	}
+	self.running = true
 	return
 }
 
@@ -127,6 +128,9 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 
 func (self * Netpoll_t) Stop() (err error) {
 	_, err = unix.Write(self.event, []byte{1, 0, 0, 0, 0, 0, 0, 0})
+	self.mx.Lock()
+	self.running = false
+	self.mx.Unlock()
 	return
 }
 

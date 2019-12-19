@@ -27,6 +27,7 @@ func New(closed_ttl time.Duration) (self * Netpoll_t, err error) {
 		unix.Close(self.poller)
 		return
 	}
+	self.running = true
 	return
 }
 
@@ -122,6 +123,9 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 func (self * Netpoll_t) Stop() (err error) {
 	event := []unix.Kevent_t{{Ident: uint64(self.event), Filter: unix.EVFILT_USER, Fflags: unix.NOTE_TRIGGER}}
 	_, err = unix.Kevent(self.poller, event, nil, nil)
+	self.mx.Lock()
+	self.running = false
+	self.mx.Unlock()
 	return
 }
 

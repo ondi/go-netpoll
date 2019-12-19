@@ -45,6 +45,7 @@ type Netpoll_t struct {
 	cond * sync.Cond
 	ready * cache.Cache_t
 	added int
+	running bool
 }
 
 func (self * Netpoll_t) __fd_event_open(fd int) {
@@ -91,45 +92,40 @@ func (self * Netpoll_t) AddEvent(fd int) {
 	}
 }
 
-func (self * Netpoll_t) read(fn READ) {
+func (self * Netpoll_t) Read(fn READ) {
 	self.mx.Lock()
-	self.cond.Wait()
-	loop:
-	now := time.Now()
-	for i := 0; i < self.ready.Size(); {
-		it := self.ready.Front()
-		state := it.Value().(* state_t)
-		if state.events & FLAG_RUNNING == FLAG_RUNNING {
-			cache.MoveBefore(it, self.ready.End())
-			i++
-			continue
-		}
-		if state.closed.After(time.Time{}) {
-			if now.Sub(state.closed) > self.closed_ttl {
+	for self.running {
+		self.cond.Wait()
+		loop:
+		now := time.Now()
+		for i := 0; i < self.ready.Size(); {
+			it := self.ready.Front()
+			state := it.Value().(* state_t)
+			if state.events & FLAG_RUNNING == FLAG_RUNNING {
+				cache.MoveBefore(it, self.ready.End())
+				i++
+				continue
+			}
+			if state.closed.After(time.Time{}) {
+				if now.Sub(state.closed) > self.closed_ttl {
+					self.ready.Remove(it.Key())
+					continue
+				}
+				cache.MoveBefore(it, self.ready.End())
+				i++
+				continue
+			} else if state.events == 0 {
 				self.ready.Remove(it.Key())
 				continue
 			}
+			state.events = FLAG_RUNNING
 			cache.MoveBefore(it, self.ready.End())
-			i++
-			continue
-		} else if state.events == 0 {
-			self.ready.Remove(it.Key())
-			continue
+			self.mx.Unlock()
+			fn(it.Key().(int))
+			self.mx.Lock()
+			state.events &= ^FLAG_RUNNING
+			goto loop
 		}
-		state.events = FLAG_RUNNING
-		cache.MoveBefore(it, self.ready.End())
-		self.mx.Unlock()
-		fn(it.Key().(int))
-		self.mx.Lock()
-		state.events &= ^FLAG_RUNNING
-		goto loop
-	}
-	self.mx.Unlock()
-}
-
-func (self * Netpoll_t) Read(fn READ) {
-	for {
-		self.read(fn)
 	}
 }
 
