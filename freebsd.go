@@ -125,6 +125,7 @@ func (self * Netpoll_t) Stop() (err error) {
 	_, err = unix.Kevent(self.poller, event, nil, nil)
 	self.mx.Lock()
 	self.running = false
+	self.cond.Broadcast()
 	self.mx.Unlock()
 	return
 }

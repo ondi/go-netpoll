@@ -130,6 +130,7 @@ func (self * Netpoll_t) Stop() (err error) {
 	_, err = unix.Write(self.event, []byte{1, 0, 0, 0, 0, 0, 0, 0})
 	self.mx.Lock()
 	self.running = false
+	self.cond.Broadcast()
 	self.mx.Unlock()
 	return
 }
