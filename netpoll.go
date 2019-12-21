@@ -114,7 +114,8 @@ func (self * Netpoll_t) Read(fn READ) {
 				cache.MoveBefore(it, self.ready.End())
 				i++
 				continue
-			} else if state.events == 0 {
+			}
+			if state.events == 0 {
 				self.ready.Remove(it.Key())
 				continue
 			}
