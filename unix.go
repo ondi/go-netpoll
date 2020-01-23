@@ -6,7 +6,6 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
-import "io"
 import "net"
 
 func GetIpPort(sa unix.Sockaddr) (ip string, port int) {
@@ -47,7 +46,7 @@ func (self FD) Read(p []byte) (n int, err error) {
 		return 0, err
 	}
 	if n <= 0 {
-		return 0, io.EOF
+		return 0, unix.ENOANO
 	}
 	return
 }
