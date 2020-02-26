@@ -4,17 +4,19 @@
 
 package netpoll
 
-import "golang.org/x/sys/unix"
+import (
+	"net"
 
-import "net"
+	"golang.org/x/sys/unix"
+)
 
-func GetIpPort(sa unix.Sockaddr) (ip string, port int) {
-	if ip4, ok := sa.(* unix.SockaddrInet4); ok {
+func GetIpPort(Sockaddr interface{}) (ip string, port int) {
+	if ip4, ok := Sockaddr.(*unix.SockaddrInet4); ok {
 		ip = net.IP(ip4.Addr[:]).String()
 		port = ip4.Port
 		return
 	}
-	if ip6, ok := sa.(* unix.SockaddrInet6); ok {
+	if ip6, ok := Sockaddr.(*unix.SockaddrInet6); ok {
 		ip = net.IP(ip6.Addr[:]).String()
 		port = ip6.Port
 	}
