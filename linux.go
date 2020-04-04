@@ -4,18 +4,20 @@
 
 package netpoll
 
-import "net"
-import "time"
-import "sync"
+import (
+	"net"
+	"sync"
+	"time"
 
-import "golang.org/x/sys/unix"
-import "github.com/ondi/go-cache"
+	"github.com/ondi/go-cache"
+	"golang.org/x/sys/unix"
+)
 
-func New(closed_ttl time.Duration) (self * Netpoll_t, err error) {
+func New(closed_ttl time.Duration) (self *Netpoll_t, err error) {
 	self = &Netpoll_t{
-		listen: -1,
+		listen:     -1,
 		closed_ttl: closed_ttl,
-		ready: cache.New(),
+		ready:      cache.New(),
 	}
 	self.cond = sync.NewCond(&self.mx)
 	if self.poller, err = unix.EpollCreate1(0); err != nil {
@@ -36,9 +38,9 @@ func New(closed_ttl time.Duration) (self * Netpoll_t, err error) {
 	return
 }
 
-func (self * Netpoll_t) Listen(ip string, port int, zone uint32, backlog int) (err error) {
+func (self *Netpoll_t) Listen(ip string, port int, zone uint32, backlog int) (err error) {
 	var listen int
-	if listen, err = unix.Socket(unix.AF_INET6, unix.SOCK_STREAM | unix.SOCK_NONBLOCK, 0); err != nil {
+	if listen, err = unix.Socket(unix.AF_INET6, unix.SOCK_STREAM|unix.SOCK_NONBLOCK, 0); err != nil {
 		return
 	}
 	addr := unix.SockaddrInet6{Port: port, ZoneId: zone}
@@ -61,7 +63,7 @@ func (self * Netpoll_t) Listen(ip string, port int, zone uint32, backlog int) (e
 	return
 }
 
-func (self * Netpoll_t) Add(fd int) (err error) {
+func (self *Netpoll_t) AddFd(fd int) (err error) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
 	if err = unix.SetNonblock(fd, true); err != nil {
@@ -72,23 +74,23 @@ func (self * Netpoll_t) Add(fd int) (err error) {
 	); err != nil {
 		return
 	}
-	self.__fd_event_open(fd)
+	self.__set_fd_open(fd)
 	self.added++
 	return
 }
 
-func (self * Netpoll_t) Del(fd int) (err error) {
+func (self *Netpoll_t) DelFd(fd int) (err error) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
 	if err = unix.EpollCtl(self.poller, unix.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return
 	}
-	self.__fd_event_close(fd)
+	self.__set_fd_closed(fd)
 	self.added--
 	return
 }
 
-func (self * Netpoll_t) Wait(events_size int) (err error) {
+func (self *Netpoll_t) Wait(events_size int) (err error) {
 	var conn int
 	var count int
 	events := make([]unix.EpollEvent, events_size)
@@ -111,14 +113,14 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 						}
 						return
 					}
-					if self.Add(conn) != nil {
+					if self.AddFd(conn) != nil {
 						unix.Close(conn)
 					}
 				}
 				continue
 			}
-			if events[i].Events & unix.EPOLLHUP == unix.EPOLLHUP {
-				self.fd_event_close(int(events[i].Fd))
+			if events[i].Events&unix.EPOLLHUP == unix.EPOLLHUP {
+				self.set_fd_closed(int(events[i].Fd))
 				continue
 			}
 			self.AddEvent(int(events[i].Fd))
@@ -126,7 +128,7 @@ func (self * Netpoll_t) Wait(events_size int) (err error) {
 	}
 }
 
-func (self * Netpoll_t) Stop() (err error) {
+func (self *Netpoll_t) Stop() (err error) {
 	_, err = unix.Write(self.event, []byte{1, 0, 0, 0, 0, 0, 0, 0})
 	self.mx.Lock()
 	self.running = false
@@ -135,7 +137,7 @@ func (self * Netpoll_t) Stop() (err error) {
 	return
 }
 
-func (self * Netpoll_t) Close() (err error) {
+func (self *Netpoll_t) Close() (err error) {
 	unix.Close(self.listen)
 	unix.Close(self.event)
 	unix.Close(self.poller)

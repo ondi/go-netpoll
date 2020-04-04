@@ -4,13 +4,15 @@
 
 package netpoll
 
-import "time"
-import "sync"
-import "testing"
+import (
+	"sync"
+	"testing"
+	"time"
+)
 
-func TestPollerStop(t * testing.T) {
+func TestPollerStop(t *testing.T) {
 	var wg sync.WaitGroup
-	
+
 	p, err := New(time.Second)
 	if err != nil {
 		t.Errorf("NEW: %v", err)
@@ -21,12 +23,12 @@ func TestPollerStop(t * testing.T) {
 		p.Wait(1024)
 		wg.Done()
 	}()
-	
+
 	go func() {
 		time.Sleep(time.Second)
 		p.Stop()
 	}()
-	
+
 	p.Wait(1024)
 	wg.Wait()
 }

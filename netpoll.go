@@ -18,11 +18,13 @@
 
 package netpoll
 
-import "net"
-import "time"
-import "sync"
+import (
+	"net"
+	"sync"
+	"time"
 
-import "github.com/ondi/go-cache"
+	"github.com/ondi/go-cache"
+)
 
 const (
 	FLAG_RUNNING uint64 = 1 << 63
@@ -36,77 +38,69 @@ type state_t struct {
 }
 
 type Netpoll_t struct {
-	poller int
-	event int
-	listen int
+	poller     int
+	event      int
+	listen     int
 	closed_ttl time.Duration
-	
-	mx sync.Mutex
-	cond * sync.Cond
-	ready * cache.Cache_t
-	added int
+
+	mx      sync.Mutex
+	cond    *sync.Cond
+	ready   *cache.Cache_t
+	added   int
 	running bool
 }
 
-func (self * Netpoll_t) __fd_event_open(fd int) {
+func (self *Netpoll_t) __set_fd_open(fd int) {
 	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
-		value.(* state_t).events &= FLAG_RUNNING
-		value.(* state_t).closed = time.Time{}
+		value.(*state_t).closed = time.Time{}
 		return value
 	})
 }
 
-func (self * Netpoll_t) __fd_event_close(fd int) {
-	if it, ok := self.ready.PushBack(fd, func() interface{} {return &state_t{closed: time.Now()}}); !ok {
-		it.Value().(* state_t).events &= FLAG_RUNNING
-		it.Value().(* state_t).closed = time.Now()
+func (self *Netpoll_t) __set_fd_closed(fd int) {
+	if it, ok := self.ready.PushBack(fd, func() interface{} { return &state_t{closed: time.Now()} }); !ok {
+		it.Value().(*state_t).closed = time.Now()
 	}
 }
 
-func (self * Netpoll_t) fd_event_open(fd int) {
+func (self *Netpoll_t) set_fd_closed(fd int) {
 	self.mx.Lock()
-	self.__fd_event_open(fd)
+	self.__set_fd_closed(fd)
 	self.mx.Unlock()
 }
 
-func (self * Netpoll_t) fd_event_close(fd int) {
-	self.mx.Lock()
-	self.__fd_event_close(fd)
-	self.mx.Unlock()
-}
-
-func (self * Netpoll_t) AddEvent(fd int) {
+func (self *Netpoll_t) AddEvent(fd int) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
-	it, ok := self.ready.PushBack(fd, func() interface{} {return &state_t{events: 1}})
+	it, ok := self.ready.PushBack(fd, func() interface{} { return &state_t{events: 1} })
 	if ok {
 		self.cond.Signal()
 		return
 	}
-	if it.Value().(* state_t).closed.After(time.Time{}) {
+	if it.Value().(*state_t).closed.IsZero() == false {
 		return
 	}
-	it.Value().(* state_t).events++
-	if it.Value().(* state_t).events & FLAG_RUNNING == 0 {
+	it.Value().(*state_t).events++
+	if it.Value().(*state_t).events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
 	}
 }
 
-func (self * Netpoll_t) Read(fn READ) {
+func (self *Netpoll_t) Read(fn READ) {
 	self.mx.Lock()
 	for self.running {
 		self.cond.Wait()
-		loop:
+	loop:
 		now := time.Now()
 		for i := 0; i < self.ready.Size(); {
 			it := self.ready.Front()
-			state := it.Value().(* state_t)
-			if state.events & FLAG_RUNNING == FLAG_RUNNING {
+			state := it.Value().(*state_t)
+			if state.events&FLAG_RUNNING == FLAG_RUNNING {
 				cache.MoveBefore(it, self.ready.End())
 				i++
 				continue
 			}
-			if state.closed.After(time.Time{}) {
+			if state.closed.IsZero() == false {
 				if now.Sub(state.closed) > self.closed_ttl {
 					self.ready.Remove(it.Key())
 					continue
@@ -130,20 +124,20 @@ func (self * Netpoll_t) Read(fn READ) {
 	}
 }
 
-func (self * Netpoll_t) SizeAdded() int {
+func (self *Netpoll_t) SizeAdded() int {
 	self.mx.Lock()
 	defer self.mx.Unlock()
 	return self.added
 }
 
-func (self * Netpoll_t) SizeReady() int {
+func (self *Netpoll_t) SizeReady() int {
 	self.mx.Lock()
 	defer self.mx.Unlock()
 	return self.ready.Size()
 }
 
 func GetFd(conn net.Conn) (fd int) {
-	if tcp_conn, ok := conn.(* net.TCPConn); ok {
+	if tcp_conn, ok := conn.(*net.TCPConn); ok {
 		if raw, err := tcp_conn.SyscallConn(); err == nil {
 			raw.Control(
 				func(c uintptr) {
