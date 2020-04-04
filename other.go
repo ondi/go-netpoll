@@ -17,11 +17,11 @@ func (self *Netpoll_t) Listen(ip string, port int, zone uint32, backlog int) err
 	return errors.New("NOT IMPLEMENTED")
 }
 
-func (self *Netpoll_t) Add(fd int) error {
+func (self *Netpoll_t) AddFd(fd int) error {
 	return errors.New("NOT IMPLEMENTED")
 }
 
-func (self *Netpoll_t) Del(fd int) error {
+func (self *Netpoll_t) DelFd(fd int) error {
 	return errors.New("NOT IMPLEMENTED")
 }
 
