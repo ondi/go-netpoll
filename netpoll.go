@@ -27,21 +27,22 @@ import (
 
 const (
 	FLAG_RUNNING uint64 = 1 << 63
+	FLAG_CLOSED  uint64 = 1 << 62
 )
 
 type READ func(int, *State_t)
 
 type State_t struct {
-	closed time.Time
-	events uint64
-	Data   interface{}
+	updated time.Time
+	events  uint64
+	Data    interface{}
 }
 
 type Netpoll_t struct {
-	poller     int
-	event      int
-	listen     int
-	closed_ttl time.Duration
+	poller int
+	event  int
+	listen int
+	ttl    time.Duration
 
 	mx      sync.Mutex
 	cond    *sync.Cond
@@ -52,14 +53,18 @@ type Netpoll_t struct {
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
-		value.(*State_t).closed = time.Time{}
+		value.(*State_t).updated = time.Now()
+		value.(*State_t).events &= ^FLAG_CLOSED
 		return value
 	})
 }
 
 func (self *Netpoll_t) __set_fd_closed(fd int) {
-	if it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{closed: time.Now()} }); !ok {
-		it.Value().(*State_t).closed = time.Now()
+	it, ok := self.ready.PushBack(fd, func() interface{} {
+		return &State_t{updated: time.Now(), events: FLAG_CLOSED}
+	})
+	if !ok {
+		it.Value().(*State_t).events |= FLAG_CLOSED
 	}
 }
 
@@ -72,14 +77,15 @@ func (self *Netpoll_t) set_fd_closed(fd int) {
 func (self *Netpoll_t) AddEvent(fd int) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
-	it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{events: 1} })
+	it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{updated: time.Now(), events: 1} })
 	if ok {
 		self.cond.Signal()
 		return
 	}
-	if it.Value().(*State_t).closed.IsZero() == false {
+	if it.Value().(*State_t).events&FLAG_CLOSED == FLAG_CLOSED {
 		return
 	}
+	it.Value().(*State_t).updated = time.Now()
 	it.Value().(*State_t).events++
 	if it.Value().(*State_t).events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
@@ -100,21 +106,12 @@ func (self *Netpoll_t) Read(fn READ) {
 				i++
 				continue
 			}
-			if state.closed.IsZero() == false {
-				if now.Sub(state.closed) > self.closed_ttl {
+			if state.events == 0 || state.events&FLAG_CLOSED == FLAG_CLOSED {
+				if now.Sub(state.updated) > self.ttl {
 					self.ready.Remove(it.Key())
 					continue
 				}
 				cache.MoveBefore(it, self.ready.End())
-				i++
-				continue
-			}
-			// remove only timed out fd's
-			// if state.events == 0 {
-			// 	self.ready.Remove(it.Key())
-			// 	continue
-			// }
-			if state.events == 0 {
 				i++
 				continue
 			}

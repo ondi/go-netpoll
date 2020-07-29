@@ -4,18 +4,20 @@
 
 package netpoll
 
-import "net"
-import "time"
-import "sync"
+import (
+	"net"
+	"sync"
+	"time"
 
-import "golang.org/x/sys/unix"
-import "github.com/ondi/go-cache"
+	"github.com/ondi/go-cache"
+	"golang.org/x/sys/unix"
+)
 
-func New(closed_ttl time.Duration) (self *Netpoll_t, err error) {
+func New(ttl time.Duration) (self *Netpoll_t, err error) {
 	self = &Netpoll_t{
-		listen:     -1,
-		closed_ttl: closed_ttl,
-		ready:      cache.New(),
+		listen: -1,
+		ttl:    ttl,
+		ready:  cache.New(),
 	}
 	self.cond = sync.NewCond(&self.mx)
 	if self.poller, err = unix.Kqueue(); err != nil {

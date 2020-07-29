@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func New(closed_ttl time.Duration) (*Netpoll_t, error) {
+func New(ttl time.Duration) (*Netpoll_t, error) {
 	return nil, errors.New("NOT IMPLEMENTED")
 }
 
