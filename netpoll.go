@@ -1,7 +1,6 @@
 //
 // Repeat Read() and Write() untill EAGAIN fired,
-// for streams use AddEvent() before breaking read cycle to be called again.
-// Add() and Del() should share the same mutex with user fd cache.
+// AddFd() and DelFd() should share the same mutex with user fd cache.
 // local cache prevents fd to run on different threads
 // and provides a read queue between epoll_wait() and Read().
 //
@@ -30,11 +29,12 @@ const (
 	FLAG_RUNNING uint64 = 1 << 63
 )
 
-type READ func(int)
+type READ func(int, *State_t)
 
-type state_t struct {
+type State_t struct {
 	closed time.Time
 	events uint64
+	Data   interface{}
 }
 
 type Netpoll_t struct {
@@ -52,14 +52,14 @@ type Netpoll_t struct {
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
-		value.(*state_t).closed = time.Time{}
+		value.(*State_t).closed = time.Time{}
 		return value
 	})
 }
 
 func (self *Netpoll_t) __set_fd_closed(fd int) {
-	if it, ok := self.ready.PushBack(fd, func() interface{} { return &state_t{closed: time.Now()} }); !ok {
-		it.Value().(*state_t).closed = time.Now()
+	if it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{closed: time.Now()} }); !ok {
+		it.Value().(*State_t).closed = time.Now()
 	}
 }
 
@@ -72,16 +72,16 @@ func (self *Netpoll_t) set_fd_closed(fd int) {
 func (self *Netpoll_t) AddEvent(fd int) {
 	self.mx.Lock()
 	defer self.mx.Unlock()
-	it, ok := self.ready.PushBack(fd, func() interface{} { return &state_t{events: 1} })
+	it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{events: 1} })
 	if ok {
 		self.cond.Signal()
 		return
 	}
-	if it.Value().(*state_t).closed.IsZero() == false {
+	if it.Value().(*State_t).closed.IsZero() == false {
 		return
 	}
-	it.Value().(*state_t).events++
-	if it.Value().(*state_t).events&FLAG_RUNNING == 0 {
+	it.Value().(*State_t).events++
+	if it.Value().(*State_t).events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
 	}
 }
@@ -94,7 +94,7 @@ func (self *Netpoll_t) Read(fn READ) {
 		now := time.Now()
 		for i := 0; i < self.ready.Size(); {
 			it := self.ready.Front()
-			state := it.Value().(*state_t)
+			state := it.Value().(*State_t)
 			if state.events&FLAG_RUNNING == FLAG_RUNNING {
 				cache.MoveBefore(it, self.ready.End())
 				i++
@@ -109,14 +109,19 @@ func (self *Netpoll_t) Read(fn READ) {
 				i++
 				continue
 			}
+			// remove only timed out fd's
+			// if state.events == 0 {
+			// 	self.ready.Remove(it.Key())
+			// 	continue
+			// }
 			if state.events == 0 {
-				self.ready.Remove(it.Key())
+				i++
 				continue
 			}
 			state.events = FLAG_RUNNING
 			cache.MoveBefore(it, self.ready.End())
 			self.mx.Unlock()
-			fn(it.Key().(int))
+			fn(it.Key().(int), it.Value().(*State_t))
 			self.mx.Lock()
 			state.events &= ^FLAG_RUNNING
 			goto loop
