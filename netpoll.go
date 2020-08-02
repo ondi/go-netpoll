@@ -106,7 +106,7 @@ func (self *Netpoll_t) Read(fn READ) {
 				i++
 				continue
 			}
-			if state.events == 0 || state.events == FLAG_CLOSED {
+			if state.events & ^FLAG_CLOSED == 0 {
 				if now.Sub(state.updated) > self.ttl {
 					self.ready.Remove(it.Key())
 					continue
