@@ -106,7 +106,7 @@ func (self *Netpoll_t) Read(fn READ) {
 				i++
 				continue
 			}
-			if state.events == 0 || state.events&FLAG_CLOSED == FLAG_CLOSED {
+			if state.events == 0 || state.events == FLAG_CLOSED {
 				if now.Sub(state.updated) > self.ttl {
 					self.ready.Remove(it.Key())
 					continue
@@ -115,7 +115,8 @@ func (self *Netpoll_t) Read(fn READ) {
 				i++
 				continue
 			}
-			state.events = FLAG_RUNNING
+			state.events &= FLAG_CLOSED
+			state.events |= FLAG_RUNNING
 			cache.MoveBefore(it, self.ready.End())
 			self.mx.Unlock()
 			fn(it.Key().(int), it.Value().(*State_t))
