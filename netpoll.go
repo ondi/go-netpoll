@@ -1,8 +1,10 @@
 //
-// Repeat Read() and Write() untill EAGAIN fired,
-// AddFd() and DelFd() should share the same mutex with user fd cache.
-// local cache prevents fd to run on different threads
-// and provides a read queue between epoll_wait() and Read().
+// Repeat Read() and Write() untill EAGAIN.
+// AddFd() and DelFd() should be under user fd cache mutex if exists.
+// Local cache prevents fd to run on different threads,
+// provides a read queue between epoll_wait() and Read()
+// and short lived state.Data for slow devices which interact like so:
+// WEBSOCKET_HEADER -> EAGAIN -> WEBSOCKET_BODY -> EAGAIN
 //
 // RACES:
 // fd may be deleted, closed and reopened right after epoll_wait()
@@ -54,7 +56,7 @@ type Netpoll_t struct {
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
 		value.(*State_t).updated = time.Now()
-		value.(*State_t).events &= ^FLAG_CLOSED
+		value.(*State_t).events &= FLAG_RUNNING
 		return value
 	})
 }
