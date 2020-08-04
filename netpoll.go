@@ -59,6 +59,7 @@ func (self *Netpoll_t) __set_fd_closed(fd int) {
 	if !ok {
 		it.Value().(*State_t).updated = time.Now()
 		it.Value().(*State_t).events = FLAG_CLOSED
+		it.Value().(*State_t).Data = nil
 	}
 }
 
