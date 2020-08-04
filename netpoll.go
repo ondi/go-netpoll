@@ -1,17 +1,9 @@
 //
 // Repeat Read() and Write() untill EAGAIN.
-// AddFd() and DelFd() should be under user fd cache mutex if exists.
 // Local cache prevents fd to run on different threads,
 // provides a read queue between epoll_wait() and Read()
-// and short lived state.Data for slow devices which interact like so:
-// WEBSOCKET_HEADER -> EAGAIN -> WEBSOCKET_BODY -> EAGAIN
-//
-// RACES:
-// fd may be deleted, closed and reopened right after epoll_wait()
-// and before processing. Read() may get fd with outdated events.
-// the following race condition present in code below:
-// one thread may call Del(fd), Add(fd) while events from epoll_wait()
-// still processing and closed flag already unset.
+// with short lived state.Data for slow devices which may interact like this:
+// WS_FRAME_PART_1 -> EAGAIN -> WS_FRAME_PART_2 -> EAGAIN -> ... -> WS_FRAME_PART_N
 //
 // see 'Possible Pitfalls and Ways to Avoid Them' for details
 // https://linux.die.net/man/4/epoll
@@ -55,8 +47,7 @@ type Netpoll_t struct {
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
-		value.(*State_t).updated = time.Now()
-		value.(*State_t).events &= FLAG_RUNNING
+		value.(*State_t).events &= ^FLAG_CLOSED
 		return value
 	})
 }
@@ -66,7 +57,8 @@ func (self *Netpoll_t) __set_fd_closed(fd int) {
 		return &State_t{updated: time.Now(), events: FLAG_CLOSED}
 	})
 	if !ok {
-		it.Value().(*State_t).events |= FLAG_CLOSED
+		it.Value().(*State_t).updated = time.Now()
+		it.Value().(*State_t).events = FLAG_CLOSED
 	}
 }
 
