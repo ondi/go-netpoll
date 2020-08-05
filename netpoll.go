@@ -1,9 +1,28 @@
 //
-// Repeat Read() and Write() untill EAGAIN.
+// Repeat Read() and Write() until EAGAIN.
 // Local cache prevents fd to run on different threads,
 // provides a read queue between epoll_wait() and Read()
-// with short lived state.Data for slow devices which may interact like this:
+// with short lived state.Data for slow clients which may interact like this:
 // WS_FRAME_PART_1 -> EAGAIN -> WS_FRAME_PART_2 -> EAGAIN -> ... -> WS_FRAME_PART_N
+//
+// USAGE:
+// if poller, err = netpoll.New(ttl); err != nil {
+// 	return
+// }
+// for i := 0; i < publishers; i++ {
+// 	go poller.Wait(poll_size)
+// }
+// for i := 0; i < consumers; i++ {
+// 	go poller.Read(server.ws_read)
+// }
+// ...
+// net_conn should be stored somewhere with fd
+// if fd, err = netpoll.GetFd(net_conn); err != nil {
+// 	return
+// }
+// if err = poller.AddFd(fd); err != nil {
+// 	 return
+// }
 //
 // see 'Possible Pitfalls and Ways to Avoid Them' for details
 // https://linux.die.net/man/4/epoll
@@ -12,8 +31,10 @@
 package netpoll
 
 import (
+	"fmt"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ondi/go-cache"
@@ -133,16 +154,14 @@ func (self *Netpoll_t) SizeReady() int {
 	return self.ready.Size()
 }
 
-func GetFd(conn net.Conn) (fd int) {
+func GetFd(conn net.Conn) (fd int, err error) {
 	if tcp_conn, ok := conn.(*net.TCPConn); ok {
-		if raw, err := tcp_conn.SyscallConn(); err == nil {
-			raw.Control(
-				func(c uintptr) {
-					fd = int(c)
-				},
-			)
+		var raw syscall.RawConn
+		if raw, err = tcp_conn.SyscallConn(); err != nil {
 			return
 		}
+		raw.Control(func(c uintptr) { fd = int(c) })
+		return
 	}
-	return -1
+	return -1, fmt.Errorf("not a *net.TCPConn")
 }

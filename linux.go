@@ -69,9 +69,16 @@ func (self *Netpoll_t) AddFd(fd int) (err error) {
 	if err = unix.SetNonblock(fd, true); err != nil {
 		return
 	}
-	if err = unix.EpollCtl(self.poller, unix.EPOLL_CTL_ADD, fd,
-		&unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLIN | unix.EPOLLRDHUP | unix.EPOLLET},
-	); err != nil {
+	err = unix.EpollCtl(
+		self.poller,
+		unix.EPOLL_CTL_ADD,
+		fd,
+		&unix.EpollEvent{
+			Fd:     int32(fd),
+			Events: unix.EPOLLIN | unix.EPOLLRDHUP | unix.EPOLLET,
+		},
+	)
+	if err != nil {
 		return
 	}
 	self.__set_fd_open(fd)
