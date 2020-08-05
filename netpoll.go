@@ -140,6 +140,7 @@ func (self *Netpoll_t) Read(fn READ) {
 			goto loop
 		}
 	}
+	self.mx.Unlock()
 }
 
 func (self *Netpoll_t) SizeAdded() int {
