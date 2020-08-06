@@ -130,7 +130,7 @@ func (self *Netpoll_t) Wait(events_size int) (err error) {
 				self.set_fd_closed(int(events[i].Fd))
 				continue
 			}
-			self.AddEvent(int(events[i].Fd))
+			self.add_event(int(events[i].Fd))
 		}
 	}
 }

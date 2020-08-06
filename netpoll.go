@@ -89,15 +89,16 @@ func (self *Netpoll_t) set_fd_closed(fd int) {
 	self.mx.Unlock()
 }
 
-func (self *Netpoll_t) AddEvent(fd int) {
+func (self *Netpoll_t) add_event(fd int) {
 	self.mx.Lock()
-	defer self.mx.Unlock()
 	it, ok := self.ready.PushBack(fd, func() interface{} { return &State_t{updated: time.Now(), events: 1} })
 	if ok {
 		self.cond.Signal()
+		self.mx.Unlock()
 		return
 	}
 	if it.Value().(*State_t).events&FLAG_CLOSED == FLAG_CLOSED {
+		self.mx.Unlock()
 		return
 	}
 	it.Value().(*State_t).updated = time.Now()
@@ -105,6 +106,7 @@ func (self *Netpoll_t) AddEvent(fd int) {
 	if it.Value().(*State_t).events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
 	}
+	self.mx.Unlock()
 }
 
 func (self *Netpoll_t) Read(fn READ) {
@@ -143,16 +145,18 @@ func (self *Netpoll_t) Read(fn READ) {
 	self.mx.Unlock()
 }
 
-func (self *Netpoll_t) SizeAdded() int {
+func (self *Netpoll_t) SizeAdded() (res int) {
 	self.mx.Lock()
-	defer self.mx.Unlock()
-	return self.added
+	res = self.added
+	self.mx.Unlock()
+	return
 }
 
-func (self *Netpoll_t) SizeReady() int {
+func (self *Netpoll_t) SizeReady() (res int) {
 	self.mx.Lock()
-	defer self.mx.Unlock()
-	return self.ready.Size()
+	res = self.ready.Size()
+	self.mx.Unlock()
+	return
 }
 
 func GetFd(conn net.Conn) (fd int, err error) {

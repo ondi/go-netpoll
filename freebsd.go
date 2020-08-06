@@ -117,7 +117,7 @@ func (self *Netpoll_t) Wait(events_size int) (err error) {
 			// 	self.fd_event_close(int(events[i].Ident))
 			// 	continue
 			// }
-			self.AddEvent(int(events[i].Ident))
+			self.add_event(int(events[i].Ident))
 		}
 	}
 }
