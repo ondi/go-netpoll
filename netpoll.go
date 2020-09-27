@@ -67,24 +67,22 @@ type Netpoll_t struct {
 }
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
-	self.ready.UpdateBack(fd, func(value interface{}) interface{} {
-		value.(*State_t).events &= ^FLAG_CLOSED
-		return value
-	})
+	if it, ok := self.ready.FindBack(fd); ok {
+		it.Value().(*State_t).events &= ^FLAG_CLOSED
+	}
 }
 
 func (self *Netpoll_t) __set_fd_closed(fd int) {
-	self.ready.WriteBack(
+	it, ok := self.ready.PushBack(
 		fd,
 		func() interface{} {
 			return &State_t{updated: time.Now(), events: FLAG_CLOSED}
 		},
-		func(prev interface{}) interface{} {
-			prev.(*State_t).updated = time.Now()
-			prev.(*State_t).events = FLAG_CLOSED
-			return prev
-		},
 	)
+	if !ok {
+		it.Value().(*State_t).updated = time.Now()
+		it.Value().(*State_t).events = FLAG_CLOSED
+	}
 }
 
 func (self *Netpoll_t) set_fd_closed(fd int) {
@@ -95,13 +93,10 @@ func (self *Netpoll_t) set_fd_closed(fd int) {
 
 func (self *Netpoll_t) add_event(fd int) {
 	self.mx.Lock()
-	it, ok := self.ready.WriteBack(
+	it, ok := self.ready.PushBack(
 		fd,
 		func() interface{} {
 			return &State_t{updated: time.Now(), events: 1}
-		},
-		func(prev interface{}) interface{} {
-			return prev
 		},
 	)
 	if ok {
