@@ -68,7 +68,7 @@ type Netpoll_t struct {
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	if it, ok := self.ready.FindBack(fd); ok {
-		it.Value().(*State_t).events &= ^FLAG_CLOSED
+		it.Value.(*State_t).events &= ^FLAG_CLOSED
 	}
 }
 
@@ -80,8 +80,8 @@ func (self *Netpoll_t) __set_fd_closed(fd int) {
 		},
 	)
 	if !ok {
-		it.Value().(*State_t).updated = time.Now()
-		it.Value().(*State_t).events = FLAG_CLOSED
+		it.Value.(*State_t).updated = time.Now()
+		it.Value.(*State_t).events = FLAG_CLOSED
 	}
 }
 
@@ -104,13 +104,13 @@ func (self *Netpoll_t) add_event(fd int) {
 		self.mx.Unlock()
 		return
 	}
-	if it.Value().(*State_t).events&FLAG_CLOSED == FLAG_CLOSED {
+	if it.Value.(*State_t).events&FLAG_CLOSED == FLAG_CLOSED {
 		self.mx.Unlock()
 		return
 	}
-	it.Value().(*State_t).updated = time.Now()
-	it.Value().(*State_t).events++
-	if it.Value().(*State_t).events&FLAG_RUNNING == 0 {
+	it.Value.(*State_t).updated = time.Now()
+	it.Value.(*State_t).events++
+	if it.Value.(*State_t).events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
 	}
 	self.mx.Unlock()
@@ -124,7 +124,7 @@ func (self *Netpoll_t) Read(fn READ) {
 		now := time.Now()
 		for i := 0; i < self.ready.Size(); {
 			it := self.ready.Front()
-			state := it.Value().(*State_t)
+			state := it.Value.(*State_t)
 			if state.events&FLAG_RUNNING == FLAG_RUNNING {
 				cache.MoveBefore(it, self.ready.End())
 				i++
@@ -132,7 +132,7 @@ func (self *Netpoll_t) Read(fn READ) {
 			}
 			if state.events & ^FLAG_CLOSED == 0 {
 				if now.Sub(state.updated) > self.ttl {
-					self.ready.Remove(it.Key())
+					self.ready.Remove(it.Key)
 					continue
 				}
 				cache.MoveBefore(it, self.ready.End())
@@ -143,7 +143,7 @@ func (self *Netpoll_t) Read(fn READ) {
 			state.events |= FLAG_RUNNING
 			cache.MoveBefore(it, self.ready.End())
 			self.mx.Unlock()
-			fn(it.Key().(int), it.Value().(*State_t))
+			fn(it.Key.(int), it.Value.(*State_t))
 			self.mx.Lock()
 			state.events &= ^FLAG_RUNNING
 			goto loop
