@@ -61,27 +61,27 @@ type Netpoll_t struct {
 
 	mx      sync.Mutex
 	cond    *sync.Cond
-	ready   *cache.Cache_t
+	ready   *cache.Cache_t[int, *State_t]
 	added   int
 	running bool
 }
 
 func (self *Netpoll_t) __set_fd_open(fd int) {
 	if it, ok := self.ready.FindBack(fd); ok {
-		it.Value.(*State_t).events &= ^FLAG_CLOSED
+		it.Value.events &= ^FLAG_CLOSED
 	}
 }
 
 func (self *Netpoll_t) __set_fd_closed(fd int) {
 	it, ok := self.ready.PushBack(
 		fd,
-		func() interface{} {
+		func() *State_t {
 			return &State_t{updated: time.Now(), events: FLAG_CLOSED}
 		},
 	)
 	if !ok {
-		it.Value.(*State_t).updated = time.Now()
-		it.Value.(*State_t).events = FLAG_CLOSED
+		it.Value.updated = time.Now()
+		it.Value.events = FLAG_CLOSED
 	}
 }
 
@@ -95,7 +95,7 @@ func (self *Netpoll_t) add_event(fd int) {
 	self.mx.Lock()
 	it, ok := self.ready.PushBack(
 		fd,
-		func() interface{} {
+		func() *State_t {
 			return &State_t{updated: time.Now(), events: 1}
 		},
 	)
@@ -104,13 +104,13 @@ func (self *Netpoll_t) add_event(fd int) {
 		self.mx.Unlock()
 		return
 	}
-	if it.Value.(*State_t).events&FLAG_CLOSED == FLAG_CLOSED {
+	if it.Value.events&FLAG_CLOSED == FLAG_CLOSED {
 		self.mx.Unlock()
 		return
 	}
-	it.Value.(*State_t).updated = time.Now()
-	it.Value.(*State_t).events++
-	if it.Value.(*State_t).events&FLAG_RUNNING == 0 {
+	it.Value.updated = time.Now()
+	it.Value.events++
+	if it.Value.events&FLAG_RUNNING == 0 {
 		self.cond.Signal()
 	}
 	self.mx.Unlock()
@@ -124,28 +124,27 @@ func (self *Netpoll_t) Read(fn READ) {
 		now := time.Now()
 		for i := 0; i < self.ready.Size(); {
 			it := self.ready.Front()
-			state := it.Value.(*State_t)
-			if state.events&FLAG_RUNNING == FLAG_RUNNING {
-				cache.MoveBefore(it, self.ready.End())
+			if it.Value.events&FLAG_RUNNING == FLAG_RUNNING {
+				it.MoveBefore(self.ready.End())
 				i++
 				continue
 			}
-			if state.events & ^FLAG_CLOSED == 0 {
-				if now.Sub(state.updated) > self.ttl {
+			if it.Value.events & ^FLAG_CLOSED == 0 {
+				if now.Sub(it.Value.updated) > self.ttl {
 					self.ready.Remove(it.Key)
 					continue
 				}
-				cache.MoveBefore(it, self.ready.End())
+				it.MoveBefore(self.ready.End())
 				i++
 				continue
 			}
-			state.events &= FLAG_CLOSED
-			state.events |= FLAG_RUNNING
-			cache.MoveBefore(it, self.ready.End())
+			it.Value.events &= FLAG_CLOSED
+			it.Value.events |= FLAG_RUNNING
+			it.MoveBefore(self.ready.End())
 			self.mx.Unlock()
-			fn(it.Key.(int), it.Value.(*State_t))
+			fn(it.Key, it.Value)
 			self.mx.Lock()
-			state.events &= ^FLAG_RUNNING
+			it.Value.events &= ^FLAG_RUNNING
 			goto loop
 		}
 	}

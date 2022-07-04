@@ -1,8 +1,8 @@
 module github.com/ondi/go-netpoll
 
-go 1.17
+go 1.18
 
 require (
-	github.com/ondi/go-cache v0.0.0-20211111075227-baee44a21c32
-	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08
+	github.com/ondi/go-cache v0.0.0-20220704124719-e18a5c0fa086
+	golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e
 )
