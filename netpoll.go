@@ -125,7 +125,7 @@ func (self *Netpoll_t) Read(fn READ) {
 		for i := 0; i < self.ready.Size(); {
 			it := self.ready.Front()
 			if it.Value.events&FLAG_RUNNING == FLAG_RUNNING {
-				it.MoveBefore(self.ready.End())
+				cache.MoveBefore(it, self.ready.End())
 				i++
 				continue
 			}
@@ -134,13 +134,13 @@ func (self *Netpoll_t) Read(fn READ) {
 					self.ready.Remove(it.Key)
 					continue
 				}
-				it.MoveBefore(self.ready.End())
+				cache.MoveBefore(it, self.ready.End())
 				i++
 				continue
 			}
 			it.Value.events &= FLAG_CLOSED
 			it.Value.events |= FLAG_RUNNING
-			it.MoveBefore(self.ready.End())
+			cache.MoveBefore(it, self.ready.End())
 			self.mx.Unlock()
 			fn(it.Key, it.Value)
 			self.mx.Lock()
