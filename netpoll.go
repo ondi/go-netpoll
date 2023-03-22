@@ -75,8 +75,8 @@ func (self *Netpoll_t) __set_fd_open(fd int) {
 func (self *Netpoll_t) __set_fd_closed(fd int) {
 	it, ok := self.ready.PushBack(
 		fd,
-		func() *State_t {
-			return &State_t{updated: time.Now(), events: FLAG_CLOSED}
+		func(p **State_t) {
+			*p = &State_t{updated: time.Now(), events: FLAG_CLOSED}
 		},
 	)
 	if !ok {
@@ -95,8 +95,8 @@ func (self *Netpoll_t) add_event(fd int) {
 	self.mx.Lock()
 	it, ok := self.ready.PushBack(
 		fd,
-		func() *State_t {
-			return &State_t{updated: time.Now(), events: 1}
+		func(p **State_t) {
+			*p = &State_t{updated: time.Now(), events: 1}
 		},
 	)
 	if ok {
