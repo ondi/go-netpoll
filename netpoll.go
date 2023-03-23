@@ -78,6 +78,7 @@ func (self *Netpoll_t) __set_fd_closed(fd int) {
 		func(p **State_t) {
 			*p = &State_t{updated: time.Now(), events: FLAG_CLOSED}
 		},
+		func(p **State_t) {},
 	)
 	if !ok {
 		it.Value.updated = time.Now()
@@ -98,6 +99,7 @@ func (self *Netpoll_t) add_event(fd int) {
 		func(p **State_t) {
 			*p = &State_t{updated: time.Now(), events: 1}
 		},
+		func(p **State_t) {},
 	)
 	if ok {
 		self.cond.Signal()
