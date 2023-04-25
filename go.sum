@@ -1,4 +1,4 @@
-github.com/ondi/go-cache v0.0.0-20230425092407-339b6a02b517 h1:gkrNsc20FR8tsxx/lddk07ZXyGoLCDx4hwYED2/phLM=
-github.com/ondi/go-cache v0.0.0-20230425092407-339b6a02b517/go.mod h1:KHvTO08bISVccwhHh62tNAJHn/P9vS9RTDvW9CKX6hA=
+github.com/ondi/go-cache v0.0.0-20230425151132-e34113a7989a h1:GiJ4x7qusRIfRmC52vcXE8GfNojglGDEHAox37hxchs=
+github.com/ondi/go-cache v0.0.0-20230425151132-e34113a7989a/go.mod h1:KHvTO08bISVccwhHh62tNAJHn/P9vS9RTDvW9CKX6hA=
 golang.org/x/sys v0.7.0 h1:3jlCCIQZPdOYu1h8BkNvLz8Kgwtae2cagcG/VamtZRU=
 golang.org/x/sys v0.7.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
